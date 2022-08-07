@@ -5,23 +5,25 @@ import io.circe.syntax._
 import fs2._
 import fs2.io.file.Files
 import scopt.OParser
-
 import scala.language.implicitConversions
+import scala.math.Ordered.orderingToOrdered
 
 object Main extends IOApp {
   val list: Pipe[IO, PriceListEntry, List[PriceListEntry]] = _.fold(List.empty[PriceListEntry])((acc, pl) => pl +: acc)
 
   def program(implicit ctx: GeneratorContext): Stream[IO, Unit] = {
-    for {
+    val outputData = for {
       enums <- Entries.load(ctx.mapping)
       _ <- Stream.emit(ctx.generator.addEntries(enums))
-      _ <- ctx.generator.generatePriceList
+      stream <- ctx.generator.generatePriceList
         .map(x => if (ctx.random) x.withRandomConstraints() else x)
         .through(list)
-        .map(x => if (ctx.prettyPrint) x.asJson.spaces4 else x.asJson.noSpaces)
-        .through(text.utf8.encode)
-        .through(Files[IO].writeAll(ctx.output)).as()
-    } yield ()
+        .map(x => x.sortWith(_.code < _.code))
+    } yield stream
+
+    JsonWriter.write(outputData)
+      .concurrently(ProtobufWriter.write(outputData))
+      .concurrently(SqlWriter.write(outputData))
   }
 
   override def run(args: List[String]): IO[ExitCode] = {

@@ -17,10 +17,10 @@ object ArgParser {
         .valueName("<file>")
         .action((x, c) => c.copy(output = Path.fromNioPath(x.toPath)))
         .text("output file"),
-      opt[File]('i', "input")
+      opt[Seq[File]]('i', "input")
         .required()
         .valueName("<file>")
-        .action((x, c) => c.copy(input = Path.fromNioPath(x.toPath)))
+        .action((x, c) => c.copy(input = x.map(file => Path.fromNioPath(file.toPath))))
         .text("input file"),
       opt[File]('m', "mapping")
         .valueName("<file>")
@@ -31,7 +31,10 @@ object ArgParser {
         .text("pretty printed output"),
       opt[Unit]('r', "random")
         .action((x, c) => c.copy(random = true))
-        .text("random values of constraints")
+        .text("random values of constraints"),
+      opt[Unit]('b', "proto")
+        .action((x, c) => c.copy(protobufOutput = true))
+        .text("generate protobuf mapping")
     )
   }
 }

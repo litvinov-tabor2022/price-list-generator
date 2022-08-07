@@ -9,17 +9,18 @@ import io.circe.fs2._
 import io.circe.generic.semiauto._
 
 import java.nio.file.NoSuchFileException
+import java.text.Normalizer
 
-case class PriceListEntry(id: String, name: String, altName: String, description: Option[String], note: Option[String],
+case class PriceListEntry(id: String, name: String, altName: String, note: Option[String],
                           constraints: Constraints, skill: Int,
                           createdAt: Option[String], code: Option[Int]) {
   def withCode(code: Int): PriceListEntry = {
-    PriceListEntry(id, name, altName, description, note, constraints, skill, createdAt, Some(code))
+    PriceListEntry(id, name, altName, note, constraints, skill, createdAt, Some(code))
   }
 
   def withRandomConstraints(): PriceListEntry = {
     val constraints = Constraints(scala.util.Random.between(0, 20), scala.util.Random.between(0, 20), scala.util.Random.between(0, 20))
-    PriceListEntry(id, name, altName, description, note, constraints, skill, createdAt, code)
+    PriceListEntry(id, name, altName, note, constraints, skill, createdAt, code)
   }
 }
 
@@ -30,7 +31,6 @@ object PriceListEntry {
       ("skill", entry.code.map(Json.fromInt).getOrElse(throw new InternalError("Empty 'skill'."))),
       ("name", Json.fromString(entry.name)),
       ("altName", Json.fromString(entry.altName)),
-      ("description", entry.description.map(Json.fromString).getOrElse(Json.Null)),
       ("note", entry.note.map(Json.fromString).getOrElse(Json.Null)),
       ("strength", Json.fromInt(entry.constraints.strength)),
       ("magic", Json.fromInt(entry.constraints.magic)),
@@ -49,14 +49,14 @@ object PriceListEntry {
         skill <- row.as[Int]("skill").left.flatMap(_ => Right(0))
         createdAt <- row.as[String]("createdAt").map(Some(_)).left.flatMap(_ => Right(None))
         id <- row.as[String]("id")
-      } yield PriceListEntry(id, name, name.toUpperCase, description, note, Constraints(strength, magic, dexterity), skill, createdAt, None)
+      } yield PriceListEntry(id, name, Normalizer.normalize(name, Normalizer.Form.NFD).replaceAll("\\p{InCombiningDiacriticalMarks}+", ""), note, Constraints(strength, magic, dexterity), skill, createdAt, None)
   }
 }
 
 case class Constraints(strength: Int, magic: Int, dexterity: Int)
 
 case class Entries(entries: Map[String, Entry]) {
-  lazy val nextCode: Int = if (entries.isEmpty) 0 else (entries.values.max.code + 1)
+  lazy val nextCode: Int = if (entries.isEmpty) 1 else (entries.values.maxBy(_.code).code + 1)
 
   def add(entry: Entry): Entries = Entries(entries + (entry.hash -> entry))
 }

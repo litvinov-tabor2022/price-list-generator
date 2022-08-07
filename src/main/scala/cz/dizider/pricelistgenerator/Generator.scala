@@ -13,13 +13,13 @@ class Generator() {
     preProcessed = entries
   }
 
-  def generatePriceList(implicit ctx: GeneratorContext): Stream[IO, PriceListEntry] =
-    Files[IO]
-      .readAll(ctx.input)
+  def generatePriceList(implicit ctx: GeneratorContext): Stream[IO, PriceListEntry] = {
+    ctx.input.map(item => Files[IO].readAll(item)
       .through(text.utf8.decode)
       .through(decodeUsingHeaders[PriceListEntry]())
       .flatMap(validation)
-      .flatMap(addCode)
+      .flatMap(addCode)).foldRight(fs2.Stream.empty.asInstanceOf[Stream[IO, PriceListEntry]])((item, acc) => acc.merge(item))
+  }
 
   def generatorState: Stream[IO, Entries] = Stream.emit(preProcessed)
 
